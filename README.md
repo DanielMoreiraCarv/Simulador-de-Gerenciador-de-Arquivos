@@ -77,6 +77,3 @@ sair
 
 Resultados Esperados
 Espera-se que o simulador forneça insights práticos sobre o funcionamento interno de um sistema de arquivos e o mecanismo de journaling, ajudando na compreensão de como sistemas operacionais gerenciam dados e mantêm a integridade do sistema diante de falhas.
-
-Link do Projeto no GitHub
-https://github.com/seu_usuario/seu_repositorio
