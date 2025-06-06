@@ -1,181 +1,139 @@
 package Trabalho.Eziquiel;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
 
-import javax.swing.JTextArea;
+public class MainGUI extends JFrame {
 
-import Trabalho.Eziquiel.Classes.Directory;
-import Trabalho.Eziquiel.Classes.Files;
-import Trabalho.Eziquiel.Classes.Journal;
+    private static final long serialVersionUID = 1663542630777450389L;
+    private JTextArea consoleOutput;
+    private JTextField commandInput;
+    private FileSystemSimulator fs;
 
-public class FileSystemSimulator {
-    private Directory root;
-    private Directory currentDirectory;
-    private Journal journal;
-    private static final String BASE_FILE = "filesystem_base.ser";
+    public MainGUI() {
+        super("Simulador de Sistema de Arquivos");
+        fs = new FileSystemSimulator();
 
-    public FileSystemSimulator() {
-        root = loadFromBase();
-        if (root == null) {
-            root = new Directory("root");
-        }
-        currentDirectory = root;
-        journal = new Journal();
-        applyJournal();
+        consoleOutput = new JTextArea(20, 50);
+        consoleOutput.setEditable(false);
+        consoleOutput.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        JScrollPane scrollPane = new JScrollPane(consoleOutput);
+
+        commandInput = new JTextField();
+        commandInput.addActionListener(new CommandHandler());
+
+        JLabel promptLabel = new JLabel(" > ");
+        promptLabel.setFont(new Font("Monospaced", Font.BOLD, 14));
+        JPanel inputPanel = new JPanel(new BorderLayout());
+        inputPanel.add(promptLabel, BorderLayout.WEST);
+        inputPanel.add(commandInput, BorderLayout.CENTER);
+
+        setLayout(new BorderLayout());
+        add(scrollPane, BorderLayout.CENTER);
+        add(inputPanel, BorderLayout.SOUTH);
+
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        pack();
+        setLocationRelativeTo(null);
+        setVisible(true);
+
+        printWelcomeMessage();
+        commandInput.requestFocusInWindow();
     }
 
-    public void criarFile(String fileName) {
-        currentDirectory.getFiles().add(new Files(fileName));
-        journal.addEntry("CREATE_FILE:" + getCurrentPath() + "/" + fileName);
-    }
-    
-    public void deletarFile(String nome) {
-    	Files delFile = currentDirectory.getFileByName(nome);
-    	if(delFile!=null) {
-    		currentDirectory.getFiles().remove(delFile);
-    	}else {
-    		System.out.println("Arquivo não encontrado no diretório \"+ currentDirectory");
-    	}
+    private void printToConsole(String text) {
+        consoleOutput.append(text + "\n");
     }
 
-    public void criarDirectory(String dirName) {
-        Directory newDir = new Directory(dirName);
-        currentDirectory.addSubdirectory(newDir);
-        journal.addEntry("CREATE_DIR:" + getCurrentPath() + "/" + dirName);
-    }
-    
-    public void deletarDirectory(String nome) {
-    	Directory delDir = currentDirectory.getSubdirectoryByName(nome);
-    	if(delDir!=null) {
-    		currentDirectory.getSubDirectory().remove(delDir);
-    	}else {
-    		System.out.println("Sub-Diretório não encontrado no diretório "+ currentDirectory);
-    	}
+    private void printWelcomeMessage() {
+        printToConsole("Simulador de Sistema de Arquivos iniciado.");
+        printHelpMessage();
     }
 
-    public void mudarDirectory(String dirName) {
-        if (dirName.equals("..")) {
-            if (currentDirectory != root && currentDirectory.getParent() != null) {
-                currentDirectory = currentDirectory.getParent();
-            }
-        } else {
-            Directory next = currentDirectory.getSubdirectoryByName(dirName);
-            if (next != null) {
-                currentDirectory = next;
+    private void printHelpMessage() {
+        printToConsole("Comandos disponíveis:");
+        printToConsole("  criar arquivo <nome>");
+        printToConsole("  criar diretorio <nome>");
+        printToConsole("  apagar arquivo <nome>");
+        printToConsole("  apagar diretorio <nome>");
+        printToConsole("  renomear arquivo <antigo> <novo>");
+        printToConsole("  renomear diretorio <antigo> <novo>");
+        printToConsole("  cd <nome>/..");
+        printToConsole("  listar");
+        printToConsole("  salvar");
+        printToConsole("  reset");
+        printToConsole("  clear");
+        printToConsole("  help");
+        printToConsole("  sair");
+    }
+
+    private class CommandHandler implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            String comando = commandInput.getText().trim();
+            commandInput.setText("");
+            printToConsole(fs.getCurrentPath() + " > " + comando);
+
+            if (comando.equals("sair")) {
+                fs.finalizeAndSave();
+                printToConsole("Sistema encerrado com sucesso.");
+                System.exit(0);
+
+            } else if (comando.startsWith("criar arquivo ")) {
+                fs.criarFile(comando.substring(14).trim());
+
+            } else if (comando.startsWith("criar diretorio ")) {
+                fs.criarDirectory(comando.substring(16).trim());
+
+            } else if (comando.startsWith("apagar arquivo ")) {
+                fs.deletarFile(comando.substring(15).trim());
+
+            } else if (comando.startsWith("apagar diretorio ")) {
+                fs.deletarDirectory(comando.substring(17).trim());
+
+            } else if (comando.startsWith("renomear arquivo ")) {
+                String[] partes = comando.substring(18).trim().split(" ");
+                if (partes.length == 2) {
+                    fs.renameFile(partes[0], partes[1]);
+                } else {
+                    printToConsole("Uso: renomear arquivo <antigo> <novo>");
+                }
+
+            } else if (comando.startsWith("renomear diretorio ")) {
+                String[] partes = comando.substring(20).trim().split(" ");
+                if (partes.length == 2) {
+                    fs.renameSubDirectory(partes[0], partes[1]);
+                } else {
+                    printToConsole("Uso: renomear diretorio <antigo> <novo>");
+                }
+
+            } else if (comando.startsWith("cd ")) {
+                fs.mudarDirectory(comando.substring(3).trim());
+
+            } else if (comando.equals("listar")) {
+                fs.lstDirectoryContentsToGUI(consoleOutput);
+
+            } else if (comando.equals("reset")) {
+                fs.resetSystem();
+
+            } else if (comando.equals("salvar")) {
+                fs.finalizeAndSave();
+
+            } else if (comando.equals("clear")) {
+                consoleOutput.setText("");
+
+            } else if (comando.equals("help")) {
+                printHelpMessage();
+
             } else {
-                System.out.println("Diretório não encontrado.");
+                printToConsole("Comando inválido. Digite 'help' para ver os comandos.");
             }
+
+            commandInput.requestFocusInWindow();
         }
     }
 
-    public void lstDirectoryContents() {
-        System.out.println("Arquivos em " + getCurrentPath() + ":");
-        for (Files file : currentDirectory.getFiles()) {
-            System.out.println("  [ARQ] " + file.getNome());
-        }
-        for (Directory dir : currentDirectory.getSubDirectory()) {
-            System.out.println("  [DIR] " + dir.getName());
-        }
-    }
-    
-    public void lstDirectoryContentsToGUI(JTextArea output) {
-        output.append("Arquivos em " + getCurrentPath() + ":\n");
-        for (Files file : currentDirectory.getFiles()) {
-            output.append("  [ARQ] " + file.getNome() + "\n");
-        }
-        for (Directory dir : currentDirectory.getSubDirectory()) {
-            output.append("  [DIR] " + dir.getName() + "\n");
-        }
-    }
-
-
-    public String getCurrentPath() {
-        StringBuilder path = new StringBuilder();
-        Directory dir = currentDirectory;
-        while (dir != null) {
-            path.insert(0, "/" + dir.getName());
-            dir = dir.getParent();
-        }
-        return path.toString();
-    }
-
-    public void resetSystem() {
-        root = new Directory("root");
-        currentDirectory = root;
-        journal.clearJournal();
-        File baseFile = new File(BASE_FILE);
-        if (baseFile.exists()) {
-            baseFile.delete();
-        }
-        System.out.println("Sistema de arquivos resetado com sucesso.");
-    }
-
-    public void finalizeAndSave() {
-        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(BASE_FILE))) {
-            out.writeObject(root);
-            journal.clearJournal();
-            System.out.println("Sistema salvo com sucesso.");
-        } catch (IOException e) {
-            System.out.println("Erro ao salvar sistema: " + e.getMessage());
-        }
-    }
-
-    private Directory loadFromBase() {
-        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(BASE_FILE))) {
-            return (Directory) in.readObject();
-        } catch (IOException | ClassNotFoundException e) {
-            return null;
-        }
-    }
-
-    private void applyJournal() {
-        for (String entry : journal.readEntries()) {
-            if (entry.startsWith("CREATE_FILE:")) {
-                createPath(entry.substring(12), true);
-            } else if (entry.startsWith("CREATE_DIR:")) {
-                createPath(entry.substring(11), false);
-            }
-        }
-    }
-
-    private void createPath(String fullPath, boolean isFile) {
-        String[] parts = fullPath.split("/");
-        Directory dir = root;
-        for (int i = 1; i < parts.length - 1; i++) {
-            Directory next = dir.getSubdirectoryByName(parts[i]);
-            if (next == null) {
-                next = new Directory(parts[i]);
-                dir.addSubdirectory(next);
-            }
-            dir = next;
-        }
-        if (isFile) {
-            dir.getFiles().add(new Files(parts[parts.length - 1]));
-        } else {
-            dir.addSubdirectory(new Directory(parts[parts.length - 1]));
-        }
-    }
-    
-    public void renameFile(String nomeAntigo, String nomeNovo) {
-    	Files file = currentDirectory.getFileByName(nomeAntigo);
-    	if(file!=null) {
-    		file.setNome(nomeNovo);
-    	}else {
-    		System.out.println("Arquivo não encontrado no diretório "+currentDirectory.getName());
-    	}
-    }
-    
-    public void renameSubDirectory(String nomeAntigo, String nomeNovo) {
-    	Directory diretorio = currentDirectory.getSubdirectoryByName(nomeAntigo);
-    	if(diretorio!=null) {
-    		diretorio.setName(nomeNovo);
-    	}else {
-    		System.out.println("Sub-Diretório "+nomeAntigo + " não encontrado no diretório "+currentDirectory.getName());
-    	}
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(MainGUI::new);
     }
 }
